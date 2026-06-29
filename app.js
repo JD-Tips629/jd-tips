@@ -1,4 +1,3 @@
-const API_BASE = window.location.origin;
 const state = {
   tips: [],
   vip: localStorage.getItem("jdTips.vip") === "true",
@@ -169,13 +168,13 @@ function tipCard(tip) {
           <input class="result-amount" data-tip-id="${tip.id}" type="number" min="0" step="0.01" placeholder="Valor opcional \u20ac" />
           <button class="primary mark-result" data-tip-id="${tip.id}" data-result="green" type="button">Green</button>
           <button class="danger mark-result" data-tip-id="${tip.id}" data-result="red" type="button">Red</button>
-         </div>`
+        </div>`
       : "";
   const editActions = state.admin
     ? `<div class="tip-actions">
         <button class="ghost edit-tip" data-tip-id="${tip.id}" type="button">Editar</button>
         <button class="danger delete-tip" data-tip-id="${tip.id}" type="button">Apagar</button>
-       </div>`
+      </div>`
     : "";
 
   return `
@@ -622,7 +621,7 @@ async function init() {
     renderWallet();
     renderAdmin();
   } catch (error) {
-    showToast("Nao foi possivel ligar ao backend.");
+    showToast("Nao foi possivel ligar ao backend. Inicia com npm start.");
   }
 }
 
