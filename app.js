@@ -1,3 +1,4 @@
+const API_BASE = window.location.origin;
 const state = {
   tips: [],
   vip: localStorage.getItem("jdTips.vip") === "true",
