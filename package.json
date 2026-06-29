@@ -1,11 +1,11 @@
 {
-  "name": "jd-tips",
+  "name": "jd-tips-render-root",
   "version": "1.0.0",
   "private": true,
-  "description": "JD-Tips PWA com backend Node.js e login admin real.",
-  "main": "server.js",
+  "description": "Entrada raiz para publicar o JD-Tips no Render.",
   "scripts": {
-    "start": "node server.js"
+    "start": "node outputs/jd-tips/server.js",
+    "build": "node --check outputs/jd-tips/server.js"
   },
   "engines": {
     "node": ">=18"
