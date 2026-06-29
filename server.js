@@ -145,32 +145,21 @@ function buildTip(body, existing = {}) {
 
 async function handleApi(req, res, url) {
   try {
-    if (req.method === "GET" && url.pathname === "/api/config") {
-      return sendJson(res, 200, PAYMENT_CONFIG);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/admin/me") {
-      return sendJson(res, 200, { admin: isAdmin(req) });
-    }
+    if (req.method === "GET" && url.pathname === "/api/config") return sendJson(res, 200, PAYMENT_CONFIG);
+    if (req.method === "GET" && url.pathname === "/api/admin/me") return sendJson(res, 200, { admin: isAdmin(req) });
 
     if (req.method === "POST" && url.pathname === "/api/admin/login") {
       const body = await readBody(req);
-      if (body.password !== ADMIN_PASSWORD) {
-        return sendJson(res, 401, { error: "Palavra-passe incorreta." });
-      }
+      if (body.password !== ADMIN_PASSWORD) return sendJson(res, 401, { error: "Palavra-passe incorreta." });
       const sessionId = crypto.randomUUID();
       sessions.set(sessionId, { createdAt: Date.now() });
-      return sendJson(res, 200, { ok: true }, {
-        "Set-Cookie": `jd_admin_session=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`,
-      });
+      return sendJson(res, 200, { ok: true }, { "Set-Cookie": `jd_admin_session=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400` });
     }
 
     if (req.method === "POST" && url.pathname === "/api/admin/logout") {
       const sessionId = parseCookies(req).jd_admin_session;
       if (sessionId) sessions.delete(sessionId);
-      return sendJson(res, 200, { ok: true }, {
-        "Set-Cookie": "jd_admin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
-      });
+      return sendJson(res, 200, { ok: true }, { "Set-Cookie": "jd_admin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0" });
     }
 
     if (req.method === "GET" && url.pathname === "/api/admin/vip-code") {
@@ -178,23 +167,15 @@ async function handleApi(req, res, url) {
       return sendJson(res, 200, { vipCode: VIP_CODE });
     }
 
-    if (req.method === "GET" && url.pathname === "/api/tips") {
-      return sendJson(res, 200, readDb().tips);
-    }
-
-    if (req.method === "GET" && url.pathname === "/api/followers") {
-      return sendJson(res, 200, { count: readDb().followers.length });
-    }
+    if (req.method === "GET" && url.pathname === "/api/tips") return sendJson(res, 200, readDb().tips);
+    if (req.method === "GET" && url.pathname === "/api/followers") return sendJson(res, 200, { count: readDb().followers.length });
 
     if (req.method === "POST" && url.pathname === "/api/followers") {
       const body = await readBody(req);
       const db = readDb();
       const followerId = String(body.followerId || crypto.randomUUID()).trim();
       if (!db.followers.some((follower) => follower.id === followerId)) {
-        db.followers.push({
-          id: followerId,
-          createdAt: new Date().toISOString(),
-        });
+        db.followers.push({ id: followerId, createdAt: new Date().toISOString() });
         writeDb(db);
       }
       return sendJson(res, 201, { followerId, count: db.followers.length });
@@ -204,10 +185,7 @@ async function handleApi(req, res, url) {
       if (!requireAdmin(req, res)) return;
       const body = await readBody(req);
       const db = readDb();
-      const tip = buildTip(body, {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-      });
+      const tip = buildTip(body, { id: crypto.randomUUID(), createdAt: new Date().toISOString() });
       db.tips.unshift(tip);
       writeDb(db);
       return sendJson(res, 201, tip);
@@ -245,9 +223,7 @@ async function handleApi(req, res, url) {
           amount: Number(item.resultAmount || 0),
           status: item.status,
           match: item.match,
-          date: item.settledAt
-            ? new Date(item.settledAt).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" })
-            : new Date().toLocaleDateString("pt-PT"),
+          date: item.settledAt ? new Date(item.settledAt).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" }) : new Date().toLocaleDateString("pt-PT"),
         }));
       writeDb(db);
       return sendJson(res, 200, tip);
@@ -363,5 +339,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`JD-Tips backend ativo em http://localhost:${PORT}`);
+  console.log(`JD-Tips backend ativo na porta ${PORT}`);
 });
