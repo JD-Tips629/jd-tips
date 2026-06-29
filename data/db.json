@@ -1,0 +1,47 @@
+{
+  "tips": [
+    {
+      "id": "tip-benfica-porto",
+      "match": "Benfica vs Porto",
+      "market": "Mais de 1.5 golos",
+      "odd": "1.58",
+      "access": "free",
+      "confidence": "Media"
+    },
+    {
+      "id": "tip-real-valencia",
+      "match": "Real Madrid vs Valencia",
+      "market": "Real Madrid vence",
+      "odd": "1.72",
+      "access": "free",
+      "confidence": "Alta"
+    },
+    {
+      "id": "tip-arsenal-chelsea",
+      "match": "Arsenal vs Chelsea",
+      "market": "Ambas marcam",
+      "odd": "1.91",
+      "access": "vip",
+      "confidence": "Alta"
+    },
+    {
+      "id": "tip-inter-napoli",
+      "match": "Inter vs Napoli",
+      "market": "Inter empate anula",
+      "odd": "1.67",
+      "access": "vip",
+      "confidence": "Muito alta"
+    },
+    {
+      "id": "tip-psg-lyon",
+      "match": "PSG vs Lyon",
+      "market": "PSG marca primeiro",
+      "odd": "1.49",
+      "access": "vip",
+      "confidence": "Alta"
+    }
+  ],
+  "paymentRequests": [],
+  "history": [],
+  "wallet": 0
+}
