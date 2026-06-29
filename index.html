@@ -52,6 +52,9 @@
           <button class="nav-item" data-section="wallet" type="button">
             <span>Ganhos</span>
           </button>
+          <button class="nav-item" data-section="results" type="button">
+            <span>Resultados</span>
+          </button>
           <button class="nav-item admin-only hidden" data-section="admin" type="button">
             <span>Admin</span>
           </button>
@@ -93,7 +96,7 @@
             <article>
               <span>Ganhos registados</span>
               <strong id="profitMetric">0 €</strong>
-              <small>Carteira local</small>
+              <small>Greens e Reds</small>
             </article>
           </div>
 
@@ -160,8 +163,16 @@
               <span id="tipFormHint">Guardado no servidor</span>
             </div>
             <label>
-              Jogo
-              <input id="matchInput" required placeholder="Ex: Inter vs Milan" />
+              Equipa casa
+              <input id="homeTeamInput" required placeholder="Ex: Inter" />
+            </label>
+            <label>
+              Equipa visitante
+              <input id="awayTeamInput" required placeholder="Ex: Milan" />
+            </label>
+            <label>
+              Hora de inicio
+              <input id="startTimeInput" required type="datetime-local" />
             </label>
             <label>
               Mercado
@@ -310,6 +321,23 @@
           <ul class="history" id="historyList"></ul>
         </section>
 
+        <section class="section" id="results">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Resultados</p>
+              <h2>Greens e Reds</h2>
+            </div>
+          </div>
+
+          <article class="feed-panel">
+            <div class="form-title">
+              <h3>Historico depois do jogo terminar</h3>
+              <span>Vitorias e perdas</span>
+            </div>
+            <div class="compact-list" id="resultsHistoryList"></div>
+          </article>
+        </section>
+
         <section class="section" id="admin">
           <div class="section-head">
             <div>
@@ -339,7 +367,7 @@
           <div class="notice">
             <strong>Como usar</strong>
             <p>
-              Confirma o dinheiro no teu MB WAY ou banco. Depois marca o pedido como pago e envia ao cliente o codigo VIP configurado em app.js.
+              Confirma o dinheiro no teu MB WAY ou banco. Depois marca o pedido como pago e envia ao cliente o codigo VIP configurado no servidor.
             </p>
           </div>
         </section>
