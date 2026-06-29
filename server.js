@@ -11,10 +11,18 @@ const VIP_CODE = process.env.VIP_CODE || "JDVIP2026";
 const PAYMENT_CONFIG = {
   mbway: process.env.MBWAY || "+351 929 298 302",
   whatsapp: process.env.WHATSAPP || "244955523337",
-  iban: process.env.IBAN || "PT50 0007 0000 0085 3052 8242 3",
+  iban: "PT50 0007 0000 0085 3052 8242 3",
   holder: process.env.ACCOUNT_HOLDER || "JD-Tips",
 };
 const sessions = new Map();
+
+const EMPTY_DB = {
+  followers: [],
+  tips: [],
+  paymentRequests: [],
+  history: [],
+  wallet: 0,
+};
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -27,6 +35,12 @@ const contentTypes = {
 };
 
 function readDb() {
+  if (!fs.existsSync(path.dirname(DB_FILE))) {
+    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+  }
+  if (!fs.existsSync(DB_FILE)) {
+    writeDb(EMPTY_DB);
+  }
   const db = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
   db.followers = Array.isArray(db.followers) ? db.followers : [];
   db.tips = Array.isArray(db.tips) ? db.tips.map(normalizeTip) : [];
