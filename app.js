@@ -1,9 +1,6 @@
 const state = {
   tips: [],
   vip: localStorage.getItem("jdTips.vip") === "true",
-  followed: localStorage.getItem("jdTips.followed") === "true",
-  followerId: localStorage.getItem("jdTips.followerId") || crypto.randomUUID(),
-  followers: 0,
   filter: "all",
   wallet: 0,
   history: [],
@@ -16,8 +13,6 @@ const state = {
     holder: "JD-Tips",
   },
 };
-
-localStorage.setItem("jdTips.followerId", state.followerId);
 
 const sections = document.querySelectorAll(".section");
 const navButtons = document.querySelectorAll(".nav-item");
@@ -49,12 +44,6 @@ const adminLoginForm = document.querySelector("#adminLoginForm");
 const adminPasswordInput = document.querySelector("#adminPasswordInput");
 const closeAdminLoginBtn = document.querySelector("#closeAdminLoginBtn");
 const adminLogoutBtn = document.querySelector("#adminLogoutBtn");
-const followerCount = document.querySelector("#followerCount");
-const heroFollowerCount = document.querySelector("#heroFollowerCount");
-const followBtn = document.querySelector("#followBtn");
-const activeTipsList = document.querySelector("#activeTipsList");
-const publicHistoryList = document.querySelector("#publicHistoryList");
-const resultsActiveList = document.querySelector("#resultsActiveList");
 const resultsHistoryList = document.querySelector("#resultsHistoryList");
 let brandTapCount = 0;
 let brandTapTimer;
@@ -147,13 +136,6 @@ function updateMembership() {
   document.querySelector("#openVipBtn").textContent = state.vip ? "VIP ativo" : "Assinar VIP";
 }
 
-function renderFollowers() {
-  followerCount.textContent = String(state.followers);
-  heroFollowerCount.textContent = String(state.followers);
-  followBtn.textContent = state.followed ? "A seguir" : "Seguir JD-Tips";
-  followBtn.disabled = state.followed;
-}
-
 function tipCard(tip) {
   const isLocked = tip.access === "vip" && !state.vip;
   const market = isLocked ? "Palpite VIP bloqueado" : tip.market;
@@ -203,18 +185,6 @@ function renderTips() {
   todayCount.textContent = String(getActiveTips().length);
 }
 
-function compactTip(tip) {
-  return `
-    <div class="feed-item">
-      <div>
-        <strong>${tip.match}</strong>
-        <p>${formatStart(tip.startTime)} | ${tip.market} | Odd ${tip.odd}</p>
-      </div>
-      <span class="status-badge ${tip.status}">${tip.status === "active" ? tip.access.toUpperCase() : tip.status.toUpperCase()}</span>
-    </div>
-  `;
-}
-
 function resultTip(tip) {
   const amount = tip.resultAmount ? ` | + ${money(tip.resultAmount)}` : "";
   return `
@@ -229,14 +199,10 @@ function resultTip(tip) {
 }
 
 function renderSocialFeed() {
-  const active = getActiveTips();
   const results = getResultTips();
-  const emptyActive = `<div class="feed-item"><p>Nenhum palpite ativo neste momento.</p></div>`;
-  const emptyResults = `<div class="feed-item"><p>Nenhum resultado marcado ainda.</p></div>`;
-  activeTipsList.innerHTML = active.length ? active.slice(0, 5).map(compactTip).join("") : emptyActive;
-  resultsActiveList.innerHTML = active.length ? active.map(compactTip).join("") : emptyActive;
-  publicHistoryList.innerHTML = results.length ? results.slice(0, 5).map(resultTip).join("") : emptyResults;
-  resultsHistoryList.innerHTML = results.length ? results.map(resultTip).join("") : emptyResults;
+  resultsHistoryList.innerHTML = results.length
+    ? results.map(resultTip).join("")
+    : `<div class="feed-item"><p>Nenhum resultado marcado ainda.</p></div>`;
 }
 
 function resetTipForm() {
@@ -329,17 +295,15 @@ function renderPaymentConfig() {
 }
 
 async function loadPublicData() {
-  const [config, tips, stats, followers] = await Promise.all([
+  const [config, tips, stats] = await Promise.all([
     api("/api/config"),
     api("/api/tips"),
     api("/api/stats"),
-    api("/api/followers"),
   ]);
   state.paymentConfig = config;
   state.tips = tips;
   state.wallet = stats.wallet;
   state.history = stats.history;
-  state.followers = followers.count;
 }
 
 async function loadAdminData() {
@@ -352,7 +316,6 @@ async function refreshAll() {
   await loadPublicData();
   if (state.admin) await loadAdminData();
   renderPaymentConfig();
-  renderFollowers();
   renderTips();
   renderSocialFeed();
   renderWallet();
@@ -440,19 +403,6 @@ document.querySelectorAll(".segment").forEach((button) => {
   });
 });
 
-followBtn.addEventListener("click", async () => {
-  if (state.followed) return;
-  const data = await api("/api/followers", {
-    method: "POST",
-    body: JSON.stringify({ followerId: state.followerId }),
-  });
-  state.followed = true;
-  state.followers = data.count;
-  localStorage.setItem("jdTips.followed", "true");
-  renderFollowers();
-  showToast("Agora segues a JD-Tips. As atualizacoes aparecem no feed.");
-});
-
 tipForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.admin) return openAdminLogin();
@@ -477,7 +427,7 @@ tipForm.addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify(tipData),
     });
-    showToast("Palpite publicado no feed.");
+    showToast("Palpite publicado.");
   }
 
   await refreshAll();
@@ -613,7 +563,6 @@ async function init() {
     state.admin = session.admin;
     await loadAdminData();
     renderPaymentConfig();
-    renderFollowers();
     renderAdminAccess();
     updateMembership();
     renderTips();
