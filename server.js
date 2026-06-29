@@ -27,7 +27,13 @@ const contentTypes = {
 };
 
 function readDb() {
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  const db = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  db.followers = Array.isArray(db.followers) ? db.followers : [];
+  db.tips = Array.isArray(db.tips) ? db.tips.map(normalizeTip) : [];
+  db.paymentRequests = Array.isArray(db.paymentRequests) ? db.paymentRequests : [];
+  db.history = Array.isArray(db.history) ? db.history : [];
+  db.wallet = Number(db.wallet || 0);
+  return db;
 }
 
 function writeDb(db) {
@@ -91,6 +97,52 @@ function safeStaticPath(urlPath) {
   return filePath;
 }
 
+function splitMatch(match) {
+  const parts = String(match || "").split(/\s+vs\s+/i);
+  return {
+    homeTeam: parts[0]?.trim() || String(match || "Equipa casa").trim(),
+    awayTeam: parts[1]?.trim() || "Equipa visitante",
+  };
+}
+
+function normalizeTip(tip) {
+  const teams = splitMatch(tip.match);
+  const homeTeam = String(tip.homeTeam || teams.homeTeam).trim();
+  const awayTeam = String(tip.awayTeam || teams.awayTeam).trim();
+  return {
+    id: tip.id || crypto.randomUUID(),
+    homeTeam,
+    awayTeam,
+    match: String(tip.match || `${homeTeam} vs ${awayTeam}`).trim(),
+    startTime: tip.startTime || new Date().toISOString(),
+    market: String(tip.market || "").trim(),
+    odd: Number(tip.odd || 1).toFixed(2),
+    access: tip.access === "vip" ? "vip" : "free",
+    confidence: tip.confidence || (tip.access === "vip" ? "Alta" : "Media"),
+    status: ["active", "green", "red"].includes(tip.status) ? tip.status : "active",
+    resultAmount: tip.resultAmount === null || tip.resultAmount === undefined ? null : Number(tip.resultAmount),
+    createdAt: tip.createdAt || new Date().toISOString(),
+    settledAt: tip.settledAt || null,
+  };
+}
+
+function buildTip(body, existing = {}) {
+  const homeTeam = String(body.homeTeam || splitMatch(body.match).homeTeam || existing.homeTeam || "").trim();
+  const awayTeam = String(body.awayTeam || splitMatch(body.match).awayTeam || existing.awayTeam || "").trim();
+  return normalizeTip({
+    ...existing,
+    homeTeam,
+    awayTeam,
+    match: `${homeTeam} vs ${awayTeam}`,
+    startTime: body.startTime || existing.startTime || new Date().toISOString(),
+    market: String(body.market || existing.market || "").trim(),
+    odd: Number(body.odd || existing.odd || 1).toFixed(2),
+    access: body.access === "vip" ? "vip" : "free",
+    confidence: body.access === "vip" ? "Alta" : "Media",
+    status: existing.status || "active",
+  });
+}
+
 async function handleApi(req, res, url) {
   try {
     if (req.method === "GET" && url.pathname === "/api/config") {
@@ -130,18 +182,32 @@ async function handleApi(req, res, url) {
       return sendJson(res, 200, readDb().tips);
     }
 
+    if (req.method === "GET" && url.pathname === "/api/followers") {
+      return sendJson(res, 200, { count: readDb().followers.length });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/followers") {
+      const body = await readBody(req);
+      const db = readDb();
+      const followerId = String(body.followerId || crypto.randomUUID()).trim();
+      if (!db.followers.some((follower) => follower.id === followerId)) {
+        db.followers.push({
+          id: followerId,
+          createdAt: new Date().toISOString(),
+        });
+        writeDb(db);
+      }
+      return sendJson(res, 201, { followerId, count: db.followers.length });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/tips") {
       if (!requireAdmin(req, res)) return;
       const body = await readBody(req);
       const db = readDb();
-      const tip = {
+      const tip = buildTip(body, {
         id: crypto.randomUUID(),
-        match: String(body.match || "").trim(),
-        market: String(body.market || "").trim(),
-        odd: Number(body.odd || 1).toFixed(2),
-        access: body.access === "vip" ? "vip" : "free",
-        confidence: body.access === "vip" ? "Alta" : "Media",
-      };
+        createdAt: new Date().toISOString(),
+      });
       db.tips.unshift(tip);
       writeDb(db);
       return sendJson(res, 201, tip);
@@ -154,16 +220,37 @@ async function handleApi(req, res, url) {
       const db = readDb();
       const index = db.tips.findIndex((tip) => tip.id === tipMatch[1]);
       if (index === -1) return sendJson(res, 404, { error: "Palpite nao encontrado." });
-      db.tips[index] = {
-        ...db.tips[index],
-        match: String(body.match || "").trim(),
-        market: String(body.market || "").trim(),
-        odd: Number(body.odd || 1).toFixed(2),
-        access: body.access === "vip" ? "vip" : "free",
-        confidence: body.access === "vip" ? "Alta" : "Media",
-      };
+      db.tips[index] = buildTip(body, db.tips[index]);
       writeDb(db);
       return sendJson(res, 200, db.tips[index]);
+    }
+
+    const tipResultMatch = url.pathname.match(/^\/api\/tips\/([^/]+)\/result$/);
+    if (tipResultMatch && req.method === "PATCH") {
+      if (!requireAdmin(req, res)) return;
+      const body = await readBody(req);
+      const db = readDb();
+      const tip = db.tips.find((item) => item.id === tipResultMatch[1]);
+      if (!tip) return sendJson(res, 404, { error: "Palpite nao encontrado." });
+      const previousAmount = Number(tip.resultAmount || 0);
+      const nextAmount = body.amount === "" || body.amount === null || body.amount === undefined ? null : Number(body.amount || 0);
+      tip.status = body.status === "red" ? "red" : "green";
+      tip.resultAmount = Number.isFinite(nextAmount) ? nextAmount : null;
+      tip.settledAt = new Date().toISOString();
+      db.wallet = Number(db.wallet || 0) - previousAmount + Number(tip.resultAmount || 0);
+      db.history = db.tips
+        .filter((item) => item.status === "green" || item.status === "red")
+        .map((item) => ({
+          id: item.id,
+          amount: Number(item.resultAmount || 0),
+          status: item.status,
+          match: item.match,
+          date: item.settledAt
+            ? new Date(item.settledAt).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" })
+            : new Date().toLocaleDateString("pt-PT"),
+        }));
+      writeDb(db);
+      return sendJson(res, 200, tip);
     }
 
     if (tipMatch && req.method === "DELETE") {
