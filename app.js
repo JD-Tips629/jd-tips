@@ -1,6 +1,9 @@
 const state = {
   tips: [],
   vip: localStorage.getItem("jdTips.vip") === "true",
+  followed: localStorage.getItem("jdTips.followed") === "true",
+  followerId: localStorage.getItem("jdTips.followerId") || crypto.randomUUID(),
+  followers: 0,
   filter: "all",
   wallet: 0,
   history: [],
@@ -13,6 +16,8 @@ const state = {
     holder: "JD-Tips",
   },
 };
+
+localStorage.setItem("jdTips.followerId", state.followerId);
 
 const sections = document.querySelectorAll(".section");
 const navButtons = document.querySelectorAll(".nav-item");
@@ -44,6 +49,13 @@ const adminLoginForm = document.querySelector("#adminLoginForm");
 const adminPasswordInput = document.querySelector("#adminPasswordInput");
 const closeAdminLoginBtn = document.querySelector("#closeAdminLoginBtn");
 const adminLogoutBtn = document.querySelector("#adminLogoutBtn");
+const followerCount = document.querySelector("#followerCount");
+const heroFollowerCount = document.querySelector("#heroFollowerCount");
+const followBtn = document.querySelector("#followBtn");
+const activeTipsList = document.querySelector("#activeTipsList");
+const publicHistoryList = document.querySelector("#publicHistoryList");
+const resultsActiveList = document.querySelector("#resultsActiveList");
+const resultsHistoryList = document.querySelector("#resultsHistoryList");
 let brandTapCount = 0;
 let brandTapTimer;
 
@@ -60,7 +72,35 @@ async function api(path, options = {}) {
 }
 
 function money(value) {
-  return `${Number(value).toLocaleString("pt-PT")} €`;
+  return `${Number(value || 0).toLocaleString("pt-PT")} \u20ac`;
+}
+
+function formatStart(value) {
+  if (!value) return "Horario a confirmar";
+  return new Intl.DateTimeFormat("pt-PT", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function toDateInputValue(value) {
+  const date = value ? new Date(value) : new Date();
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function getActiveTips() {
+  return state.tips
+    .filter((tip) => tip.status === "active")
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+}
+
+function getResultTips() {
+  return state.tips
+    .filter((tip) => tip.status === "green" || tip.status === "red")
+    .sort((a, b) => new Date(b.settledAt || b.createdAt) - new Date(a.settledAt || a.createdAt));
 }
 
 function showToast(message) {
@@ -107,42 +147,96 @@ function updateMembership() {
   document.querySelector("#openVipBtn").textContent = state.vip ? "VIP ativo" : "Assinar VIP";
 }
 
+function renderFollowers() {
+  followerCount.textContent = String(state.followers);
+  heroFollowerCount.textContent = String(state.followers);
+  followBtn.textContent = state.followed ? "A seguir" : "Seguir JD-Tips";
+  followBtn.disabled = state.followed;
+}
+
+function tipCard(tip) {
+  const isLocked = tip.access === "vip" && !state.vip;
+  const market = isLocked ? "Palpite VIP bloqueado" : tip.market;
+  const odd = isLocked ? "--" : tip.odd;
+  const statusLabel = tip.status === "active" ? "Ativo" : tip.status.toUpperCase();
+  const button = isLocked
+    ? `<button class="primary unlock" data-section-target="vip" type="button">Desbloquear VIP</button>`
+    : "";
+  const adminActions =
+    state.admin && tip.status === "active"
+      ? `<div class="result-actions">
+          <input class="result-amount" data-tip-id="${tip.id}" type="number" min="0" step="0.01" placeholder="Valor opcional \u20ac" />
+          <button class="primary mark-result" data-tip-id="${tip.id}" data-result="green" type="button">Green</button>
+          <button class="danger mark-result" data-tip-id="${tip.id}" data-result="red" type="button">Red</button>
+        </div>`
+      : "";
+  const editActions = state.admin
+    ? `<div class="tip-actions">
+        <button class="ghost edit-tip" data-tip-id="${tip.id}" type="button">Editar</button>
+        <button class="danger delete-tip" data-tip-id="${tip.id}" type="button">Apagar</button>
+      </div>`
+    : "";
+
+  return `
+    <article class="tips-card ${isLocked ? "locked" : ""}">
+      <small>${tip.access.toUpperCase()} | ${formatStart(tip.startTime)} | ${statusLabel}</small>
+      <h3>${tip.homeTeam || tip.match} vs ${tip.awayTeam || ""}</h3>
+      <div class="pick ${isLocked ? "blurred" : ""}">${market}</div>
+      <div class="meta">
+        <span>Odd</span>
+        <strong>${odd}</strong>
+      </div>
+      ${tip.status !== "active" ? `<span class="status-badge ${tip.status}">${tip.status.toUpperCase()}</span>` : ""}
+      ${tip.resultAmount ? `<p class="result-money">Resultado: + ${money(tip.resultAmount)}</p>` : ""}
+      ${button}
+      ${adminActions}
+      ${editActions}
+    </article>
+  `;
+}
+
 function renderTips() {
   const visibleTips = state.tips.filter((tip) => state.filter === "all" || tip.access === state.filter);
-  tipsGrid.innerHTML = visibleTips
-    .map((tip) => {
-      const isLocked = tip.access === "vip" && !state.vip;
-      const pickClass = isLocked ? "pick blurred" : "pick";
-      const market = isLocked ? "Palpite VIP bloqueado" : tip.market;
-      const odd = isLocked ? "--" : tip.odd;
-      const button = isLocked
-        ? `<button class="primary unlock" data-section-target="vip" type="button">Desbloquear VIP</button>`
-        : "";
+  tipsGrid.innerHTML = visibleTips.length
+    ? visibleTips.map(tipCard).join("")
+    : `<article class="tips-card"><h3>Nenhum palpite publicado ainda.</h3><p>Quando o admin publicar, aparece aqui.</p></article>`;
+  todayCount.textContent = String(getActiveTips().length);
+}
 
-      return `
-        <article class="tips-card ${isLocked ? "locked" : ""}">
-          <small>${tip.access.toUpperCase()} | Confianca ${tip.confidence}</small>
-          <h3>${tip.match}</h3>
-          <div class="${pickClass}">${market}</div>
-          <div class="meta">
-            <span>Odd</span>
-            <strong>${odd}</strong>
-          </div>
-          ${button}
-          ${
-            state.admin
-              ? `<div class="tip-actions">
-                  <button class="ghost edit-tip" data-tip-id="${tip.id}" type="button">Editar</button>
-                  <button class="danger delete-tip" data-tip-id="${tip.id}" type="button">Apagar</button>
-                </div>`
-              : ""
-          }
-        </article>
-      `;
-    })
-    .join("");
+function compactTip(tip) {
+  return `
+    <div class="feed-item">
+      <div>
+        <strong>${tip.match}</strong>
+        <p>${formatStart(tip.startTime)} | ${tip.market} | Odd ${tip.odd}</p>
+      </div>
+      <span class="status-badge ${tip.status}">${tip.status === "active" ? tip.access.toUpperCase() : tip.status.toUpperCase()}</span>
+    </div>
+  `;
+}
 
-  todayCount.textContent = String(state.tips.length);
+function resultTip(tip) {
+  const amount = tip.resultAmount ? ` | + ${money(tip.resultAmount)}` : "";
+  return `
+    <div class="feed-item">
+      <div>
+        <strong>${tip.match}</strong>
+        <p>${tip.market} | Odd ${tip.odd}${amount}</p>
+      </div>
+      <span class="status-badge ${tip.status}">${tip.status.toUpperCase()}</span>
+    </div>
+  `;
+}
+
+function renderSocialFeed() {
+  const active = getActiveTips();
+  const results = getResultTips();
+  const emptyActive = `<div class="feed-item"><p>Nenhum palpite ativo neste momento.</p></div>`;
+  const emptyResults = `<div class="feed-item"><p>Nenhum resultado marcado ainda.</p></div>`;
+  activeTipsList.innerHTML = active.length ? active.slice(0, 5).map(compactTip).join("") : emptyActive;
+  resultsActiveList.innerHTML = active.length ? active.map(compactTip).join("") : emptyActive;
+  publicHistoryList.innerHTML = results.length ? results.slice(0, 5).map(resultTip).join("") : emptyResults;
+  resultsHistoryList.innerHTML = results.length ? results.map(resultTip).join("") : emptyResults;
 }
 
 function resetTipForm() {
@@ -158,7 +252,9 @@ function startTipEdit(tipId) {
   const tip = state.tips.find((item) => item.id === tipId);
   if (!tip) return;
   editingTipId.value = tip.id;
-  document.querySelector("#matchInput").value = tip.match;
+  document.querySelector("#homeTeamInput").value = tip.homeTeam || tip.match.split(" vs ")[0] || "";
+  document.querySelector("#awayTeamInput").value = tip.awayTeam || tip.match.split(" vs ")[1] || "";
+  document.querySelector("#startTimeInput").value = toDateInputValue(tip.startTime);
   document.querySelector("#marketInput").value = tip.market;
   document.querySelector("#oddInput").value = tip.odd;
   document.querySelector("#accessInput").value = tip.access;
@@ -171,13 +267,17 @@ function startTipEdit(tipId) {
 }
 
 function renderWallet() {
-  profitMetric.textContent = money(state.wallet);
+  const greenCount = getResultTips().filter((tip) => tip.status === "green").length;
+  profitMetric.textContent = `${greenCount} Green`;
   walletTotal.textContent = money(state.wallet);
   historyList.innerHTML =
-    state.history.length === 0
-      ? `<li><span>Nenhum ganho registado ainda</span><strong>0 €</strong></li>`
-      : state.history
-          .map((item) => `<li><span>${item.date}</span><strong>+ ${money(item.amount)}</strong></li>`)
+    getResultTips().length === 0
+      ? `<li><span>Nenhum resultado registado ainda</span><strong>0 \u20ac</strong></li>`
+      : getResultTips()
+          .map((tip) => {
+            const amount = tip.resultAmount ? `+ ${money(tip.resultAmount)}` : "Sem valor";
+            return `<li><span>${tip.match} | ${tip.status.toUpperCase()}</span><strong>${amount}</strong></li>`;
+          })
           .join("");
 }
 
@@ -207,10 +307,10 @@ function renderAdmin() {
           .join("");
 
   adminResults.innerHTML =
-    state.history.length === 0
+    getResultTips().length === 0
       ? `<div class="admin-item"><p>Nenhum resultado registado ainda.</p></div>`
-      : state.history
-          .map((item) => `<div class="admin-item"><strong>+ ${money(item.amount)}</strong><p>${item.date}</p></div>`)
+      : getResultTips()
+          .map((tip) => `<div class="admin-item"><strong>${tip.status.toUpperCase()} - ${tip.match}</strong><p>${tip.resultAmount ? money(tip.resultAmount) : "Sem valor financeiro"}</p></div>`)
           .join("");
 }
 
@@ -229,21 +329,34 @@ function renderPaymentConfig() {
 }
 
 async function loadPublicData() {
-  const [config, tips, stats] = await Promise.all([
+  const [config, tips, stats, followers] = await Promise.all([
     api("/api/config"),
     api("/api/tips"),
     api("/api/stats"),
+    api("/api/followers"),
   ]);
   state.paymentConfig = config;
   state.tips = tips;
   state.wallet = stats.wallet;
   state.history = stats.history;
+  state.followers = followers.count;
 }
 
 async function loadAdminData() {
   if (!state.admin) return;
   const requests = await api("/api/payment-requests");
   state.paymentRequests = requests;
+}
+
+async function refreshAll() {
+  await loadPublicData();
+  if (state.admin) await loadAdminData();
+  renderPaymentConfig();
+  renderFollowers();
+  renderTips();
+  renderSocialFeed();
+  renderWallet();
+  renderAdmin();
 }
 
 document.addEventListener("click", async (event) => {
@@ -275,16 +388,14 @@ document.addEventListener("click", async (event) => {
       method: "PATCH",
       body: JSON.stringify({ status: "Pago" }),
     });
-    await loadAdminData();
-    renderAdmin();
+    await refreshAll();
     showToast("Pagamento marcado como pago. Envia o codigo VIP ao cliente.");
   }
 
   const deleteRequest = event.target.closest(".delete-request");
   if (deleteRequest) {
     await api(`/api/payment-requests/${deleteRequest.dataset.requestId}`, { method: "DELETE" });
-    await loadAdminData();
-    renderAdmin();
+    await refreshAll();
     showToast("Pedido removido.");
   }
 
@@ -299,12 +410,24 @@ document.addEventListener("click", async (event) => {
     if (!state.admin) return openAdminLogin();
     const deleted = state.tips.find((item) => item.id === deleteTip.dataset.tipId);
     await api(`/api/tips/${deleteTip.dataset.tipId}`, { method: "DELETE" });
-    await loadPublicData();
-    renderPaymentConfig();
-    renderTips();
-    renderWallet();
+    await refreshAll();
     if (editingTipId.value === deleteTip.dataset.tipId) resetTipForm();
     showToast(`Palpite ${deleted?.match || ""} apagado.`);
+  }
+
+  const markResult = event.target.closest(".mark-result");
+  if (markResult) {
+    if (!state.admin) return openAdminLogin();
+    const amountInput = document.querySelector(`.result-amount[data-tip-id="${markResult.dataset.tipId}"]`);
+    await api(`/api/tips/${markResult.dataset.tipId}/result`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: markResult.dataset.result,
+        amount: amountInput?.value || "",
+      }),
+    });
+    await refreshAll();
+    showToast(`Palpite marcado como ${markResult.dataset.result.toUpperCase()}.`);
   }
 });
 
@@ -317,16 +440,30 @@ document.querySelectorAll(".segment").forEach((button) => {
   });
 });
 
+followBtn.addEventListener("click", async () => {
+  if (state.followed) return;
+  const data = await api("/api/followers", {
+    method: "POST",
+    body: JSON.stringify({ followerId: state.followerId }),
+  });
+  state.followed = true;
+  state.followers = data.count;
+  localStorage.setItem("jdTips.followed", "true");
+  renderFollowers();
+  showToast("Agora segues a JD-Tips. As atualizacoes aparecem no feed.");
+});
+
 tipForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.admin) return openAdminLogin();
 
   const tipData = {
-    match: document.querySelector("#matchInput").value.trim(),
+    homeTeam: document.querySelector("#homeTeamInput").value.trim(),
+    awayTeam: document.querySelector("#awayTeamInput").value.trim(),
+    startTime: new Date(document.querySelector("#startTimeInput").value).toISOString(),
     market: document.querySelector("#marketInput").value.trim(),
     odd: Number(document.querySelector("#oddInput").value).toFixed(2),
     access: document.querySelector("#accessInput").value,
-    confidence: document.querySelector("#accessInput").value === "vip" ? "Alta" : "Media",
   };
 
   if (editingTipId.value) {
@@ -340,11 +477,10 @@ tipForm.addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify(tipData),
     });
-    showToast("Palpite publicado com sucesso.");
+    showToast("Palpite publicado no feed.");
   }
 
-  await loadPublicData();
-  renderTips();
+  await refreshAll();
   resetTipForm();
 });
 
@@ -358,9 +494,7 @@ document.querySelector("#walletForm").addEventListener("submit", async (event) =
     method: "POST",
     body: JSON.stringify({ amount }),
   });
-  await loadPublicData();
-  renderWallet();
-  renderAdmin();
+  await refreshAll();
   event.target.reset();
   showToast("Ganho adicionado a carteira.");
 });
@@ -447,10 +581,8 @@ adminLoginForm.addEventListener("submit", async (event) => {
     });
     state.admin = true;
     closeAdminLogin();
-    await loadAdminData();
+    await refreshAll();
     renderAdminAccess();
-    renderTips();
-    renderAdmin();
     showToast("Admin desbloqueado.");
     setSection("admin");
   } catch (error) {
@@ -481,9 +613,11 @@ async function init() {
     state.admin = session.admin;
     await loadAdminData();
     renderPaymentConfig();
+    renderFollowers();
     renderAdminAccess();
     updateMembership();
     renderTips();
+    renderSocialFeed();
     renderWallet();
     renderAdmin();
   } catch (error) {
