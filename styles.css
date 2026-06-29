@@ -393,6 +393,66 @@ h3 {
   border-top: 1px solid var(--line);
 }
 
+.results-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.feed-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 10px 26px rgba(16, 24, 32, 0.06);
+  padding: 18px;
+}
+
+.compact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.feed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px 14px;
+}
+
+.feed-item p {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(16, 24, 32, 0.08);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.status-badge.green {
+  background: rgba(16, 185, 129, 0.16);
+  color: var(--accent-strong);
+}
+
+.status-badge.red {
+  background: rgba(189, 52, 70, 0.14);
+  color: var(--danger);
+}
+
 .section-head {
   margin-bottom: 18px;
 }
@@ -443,14 +503,30 @@ h3 {
   gap: 12px;
 }
 
-.tip-actions {
+.result-money {
+  margin: 12px 0 0;
+  color: var(--accent-strong);
+  font-weight: 900;
+}
+
+.tip-actions,
+.result-actions {
   display: flex;
   gap: 8px;
   margin-top: 14px;
 }
 
-.tip-actions button {
+.tip-actions button,
+.result-actions button {
   flex: 1;
+}
+
+.result-actions {
+  flex-wrap: wrap;
+}
+
+.result-actions input {
+  flex: 1 1 150px;
 }
 
 .hidden {
@@ -799,6 +875,7 @@ body.dark .notice {
   .tips-grid,
   .plans,
   .hero-panel,
+  .results-board,
   .payment-methods,
   .payment-form,
   .unlock-form,
